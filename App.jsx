@@ -1,125 +1,386 @@
 import React, { useState, useEffect } from "react";
+function getCurrentWeekDates() {
+  const today = new Date();
+  const week = [];
+  const dayOfWeek = today.getDay(); // 0 (Sun) - 6 (Sat)
+  const sunday = new Date(today);
+  sunday.setDate(today.getDate() - dayOfWeek);
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(sunday);
+    d.setDate(sunday.getDate() + i);
+    week.push(d);
+  }
+  return week;
+}
 
-const emojiFor = (txt) => {
-  const t = txt.toLowerCase();
-  if (t.includes("bath")) return "🛁";
-  if (t.includes("study")) return "📚";
-  if (t.includes("eat")) return "🍕";
-  if (t.includes("sleep")) return "😴";
-  if (t.includes("gym")) return "💪";
+const getEmojiForTask = (task) => {
+  const text = task.toLowerCase();
+  if (text.includes("bath")) return "🛁";
+  if (text.includes("study")) return "📚";
+  if (text.includes("eat")) return "🍕";
+  if (text.includes("sleep")) return "😴";
+  if (text.includes("gym")) return "💪";
   return "✨";
 };
 
-const fmtTime = (d) => d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+const priorityIcons = {
+  high: "🔥",
+  medium: "⭐",
+  low: "🌿",
+};
+const priorityColors = {
+  high: "text-red-600",
+  medium: "text-yellow-600",
+  low: "text-green-600",
+};
 
 function App() {
-  const [now, setNow] = useState(new Date());
+  const [currentTime, setCurrentTime] = useState(new Date());
   const [tasks, setTasks] = useState(() => {
     const saved = localStorage.getItem("tasks");
     return saved ? JSON.parse(saved) : [];
   });
-  const [text, setText] = useState("");
-  const [time, setTime] = useState("");
+
+  const [input, setInput] = useState("");
+  const [scheduledTime, setScheduledTime] = useState("");
+  const [priority, setPriority] = useState("medium");
 
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
   }, []);
 
   useEffect(() => {
     localStorage.setItem("tasks", JSON.stringify(tasks));
   }, [tasks]);
 
-  const addTask = () => {
-    const t = text.trim();
-    if (!t) return;
+  const handleAddTask = () => {
+    const trimmed = input.trim();
+    if (!trimmed) return;
+
     const newTask = {
-      text: t,
-      done: false,
-      created: new Date().toISOString(),
-      sched: time || null,
+      id: Date.now(),
+      text: trimmed,
+      completed: false,
+      createdAt: new Date().toISOString(),
+      scheduledTime: scheduledTime || null,
+      priority,
     };
-    setTasks([...tasks, newTask]);
-    setText("");
-    setTime("");
+
+    setTasks((prev) => [...prev, newTask]);
+    setInput("");
+    setScheduledTime("");
+    setPriority("medium");
   };
 
-  const toggleDone = (i) => {
-    const updated = [...tasks];
-    updated[i].done = !updated[i].done;
-    setTasks(updated);
+  const toggleTaskDone = (id) => {
+    setTasks((prev) =>
+      prev.map((task) =>
+        task.id === id ? { ...task, completed: !task.completed } : task
+      )
+    );
   };
 
-  const remove = (i) => {
-    setTasks(tasks.filter((_, idx) => idx !== i));
+  const removeTask = (id) => {
+    setTasks((prev) => prev.filter((task) => task.id !== id));
   };
 
-  const sorted = [...tasks].sort((a, b) => {
-    if (!a.sched) return 1;
-    if (!b.sched) return -1;
-    return a.sched.localeCompare(b.sched);
+  const priorityOrder = { high: 1, medium: 2, low: 3 };
+  const sortedTasks = [...tasks].sort((a, b) => {
+    if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
+      return priorityOrder[a.priority] - priorityOrder[b.priority];
+    }
+    if (!a.scheduledTime) return 1;
+    if (!b.scheduledTime) return -1;
+    return a.scheduledTime.localeCompare(b.scheduledTime);
   });
 
+  // For date bar
+  const weekDates = getCurrentWeekDates();
+  const today = new Date();
+
   return (
-    <div className="min-h-screen bg-gradient-to-tr from-pink-200 via-pink-100 to-pink-300 flex flex-col items-center justify-center p-6">
-      <div className="w-full max-w-md bg-white p-8 rounded-3xl shadow-xl border border-pink-300">
-        <div className="text-center mb-6">
-          <p className="text-pink-600 font-semibold text-lg tracking-wide">Current Time</p>
-          <h2 className="text-4xl font-extrabold text-pink-700 drop-shadow-md">{now.toLocaleTimeString()}</h2>
+    <div
+      style={{
+        minHeight: "100vh",
+        background:
+          "linear-gradient(135deg, #fbc2eb 0%, #f8d3e5 50%, #fbc2eb 100%)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 420,
+          background: "#fff",
+          padding: 32,
+          borderRadius: 30,
+          boxShadow:
+            "6px 6px 16px #d1d9e6, -6px -6px 16px #ffffff",
+          border: "1px solid #fbc2eb",
+        }}
+      >
+        {/* Date bar */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            marginBottom: 24,
+            justifyContent: "space-between",
+          }}
+        >
+          {/* Week days and dates */}
+          <div style={{ display: "flex", gap: 8, flex: 1 }}>
+            {weekDates.map((date, idx) => {
+              const isToday =
+                date.getDate() === today.getDate() &&
+                date.getMonth() === today.getMonth() &&
+                date.getFullYear() === today.getFullYear();
+              return (
+                <div
+                  key={idx}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 40,
+                    height: 50,
+                    borderRadius: 16,
+                    background: isToday
+                      ? "linear-gradient(135deg, #c084fc 0%, #a5b4fc 100%)"
+                      : "transparent",
+                    color: isToday ? "#fff" : "#be185d",
+                    fontWeight: isToday ? 700 : 500,
+                    fontSize: 15,
+                    boxShadow: isToday
+                      ? "0 2px 8px #c084fc33"
+                      : "none",
+                  }}
+                >
+                  <span style={{ opacity: 0.7, fontSize: 13 }}>
+                    {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][
+                      date.getDay()
+                    ]}
+                  </span>
+                  <span style={{ fontSize: 18 }}>{date.getDate()}</span>
+                </div>
+              );
+            })}
+          </div>
+          {/* Small current time on right */}
+          <div
+            style={{
+              marginLeft: 16,
+              color: "#be185d",
+              fontWeight: 700,
+              fontSize: 16,
+              minWidth: 70,
+              textAlign: "right",
+            }}
+          >
+            {currentTime.toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </div>
         </div>
-        <h1 className="text-4xl font-bold text-pink-600 text-center mb-8 select-none">💖 Laya's To-Do List 💖</h1>
-        <div className="flex gap-3 mb-6">
+
+        {/* Title */}
+        <h1
+          style={{
+            fontSize: 32,
+            fontWeight: 700,
+            color: "#db2777",
+            textAlign: "center",
+            marginBottom: 32,
+            userSelect: "none",
+          }}
+        >
+          💖 Me+ To-Do List 💖
+        </h1>
+
+        {/* Input */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>
           <input
             type="text"
-            className="flex-grow p-3 border border-pink-300 rounded-2xl focus:outline-none focus:ring-4 focus:ring-pink-400 transition"
             placeholder="✨ Add a cute task..."
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && addTask()}
+            style={{
+              padding: 12,
+              border: "1px solid #fbc2eb",
+              borderRadius: 16,
+              outline: "none",
+              fontSize: 16,
+              marginBottom: 0,
+            }}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleAddTask()}
+            aria-label="Task description"
           />
-          <input
-            type="time"
-            className="w-24 p-3 border border-pink-300 rounded-2xl focus:outline-none focus:ring-4 focus:ring-pink-400 transition"
-            value={time}
-            onChange={(e) => setTime(e.target.value)}
-            aria-label="Select time for the task"
-          />
-          <button
-            onClick={addTask}
-            className="bg-pink-500 hover:bg-pink-600 text-white px-5 py-3 rounded-2xl font-semibold shadow-md transition-transform active:scale-95"
-            aria-label="Add task"
-          >
-            ➕
-          </button>
-        </div>
-        <ul className="space-y-4 max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-pink-400 scrollbar-track-pink-100">
-          {tasks.length === 0 && (
-            <p className="text-center text-pink-400 italic select-none">No tasks yet! Add something cute ✨</p>
-          )}
-          {sorted.map((task, i) => (
-            <li
-              key={i}
-              className="flex justify-between items-center bg-pink-50 p-4 rounded-2xl shadow hover:shadow-lg transition"
+
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <input
+              type="time"
+              style={{
+                width: 90,
+                padding: 12,
+                border: "1px solid #fbc2eb",
+                borderRadius: 16,
+                outline: "none",
+                fontSize: 16,
+              }}
+              value={scheduledTime}
+              onChange={(e) => setScheduledTime(e.target.value)}
+              aria-label="Select time for the task"
+            />
+
+            <select
+              style={{
+                padding: 12,
+                border: "1px solid #fbc2eb",
+                borderRadius: 16,
+                outline: "none",
+                fontSize: 16,
+                color: "#db2777",
+                fontWeight: 600,
+              }}
+              value={priority}
+              onChange={(e) => setPriority(e.target.value)}
+              aria-label="Select task priority"
             >
-              <div
-                onClick={() => toggleDone(i)}
-                className={`cursor-pointer flex-1 select-none flex items-center gap-3 ${
-                  task.done ? "line-through text-pink-400" : "text-pink-800"
-                }`}
+              <option value="high">🔥 High</option>
+              <option value="medium">⭐ Medium</option>
+              <option value="low">🌿 Low</option>
+            </select>
+
+            <button
+              onClick={handleAddTask}
+              style={{
+                background: "#ec4899",
+                color: "#fff",
+                padding: "12px 20px",
+                borderRadius: 16,
+                fontWeight: 600,
+                fontSize: 18,
+                border: "none",
+                boxShadow: "0 2px 6px #fbc2eb",
+                cursor: "pointer",
+                transition: "background .2s, transform .1s",
+              }}
+              aria-label="Add task"
+            >
+              ➕
+            </button>
+          </div>
+        </div>
+
+        {/* Task list */}
+        <ul style={{ listStyle: "none", padding: 0, margin: 0, maxHeight: 400, overflowY: "auto" }}>
+          {tasks.length === 0 && (
+            <p style={{ textAlign: "center", color: "#f472b6", fontStyle: "italic", userSelect: "none" }}>
+              No tasks yet! Add something cute ✨
+            </p>
+          )}
+
+          {sortedTasks.map((task) => (
+            <li
+              key={task.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                background: "#fdf2f8",
+                padding: 16,
+                borderRadius: 24,
+                boxShadow:
+                  "3px 3px 8px #d1d9e6, -3px -3px 8px #ffffff",
+                marginBottom: 16,
+                cursor: "pointer",
+                gap: 12,
+              }}
+            >
+              {/* Emoji */}
+              <span
+                style={{
+                  fontSize: 26,
+                  flexShrink: 0,
+                  marginRight: 8,
+                  cursor: "pointer",
+                }}
+                onClick={() => toggleTaskDone(task.id)}
                 title="Click to toggle done"
               >
-                <span className="text-2xl">{task.done ? "✅" : emojiFor(task.text)}</span>
-                <div>
-                  <p className="font-medium">
-                    {task.text}{" "}
-                    {task.sched && <span className="text-xs text-pink-500 ml-2 font-semibold">⏰ {task.sched}</span>}
-                  </p>
-                  <p className="text-xs text-pink-400">Added at {fmtTime(new Date(task.created))}</p>
-                </div>
-              </div>
+                {task.completed ? "✅" : getEmojiForTask(task.text)}
+              </span>
+
+              {/* Task text - flex-grow to take all available space */}
+              <span
+                style={{
+                  fontWeight: 600,
+                  userSelect: "text",
+                  color: task.completed ? "#f472b6" : "#be185d",
+                  textDecoration: task.completed ? "line-through" : "none",
+                  fontSize: 18,
+                  flexGrow: 1,
+                  marginRight: 0,
+                  cursor: "pointer",
+                }}
+                onClick={() => toggleTaskDone(task.id)}
+              >
+                {task.text}
+              </span>
+
+              {/* Time - spaced far right */}
+              {task.scheduledTime && (
+                <span
+                  style={{
+                    fontSize: 15,
+                    color: "#db2777",
+                    fontWeight: 600,
+                    marginLeft: 48, // big space between text and time
+                    flexShrink: 0,
+                  }}
+                >
+                  {task.scheduledTime}
+                </span>
+              )}
+
+              {/* Priority */}
+              <span
+                style={{
+                  fontWeight: 600,
+                  fontSize: 18,
+                  marginLeft: 14,
+                  color:
+                    task.priority === "high"
+                      ? "#dc2626"
+                      : task.priority === "medium"
+                      ? "#ca8a04"
+                      : "#16a34a",
+                  flexShrink: 0,
+                }}
+                title={task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+              >
+                {priorityIcons[task.priority]}
+              </span>
+
+              {/* Delete */}
               <button
-                onClick={() => remove(i)}
-                className="text-red-500 hover:text-red-700 text-2xl transition-colors"
+                onClick={() => removeTask(task.id)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#dc2626",
+                  fontSize: 22,
+                  marginLeft: 14,
+                  cursor: "pointer",
+                  flexShrink: 0,
+                  transition: "color .2s",
+                }}
                 aria-label={`Remove task: ${task.text}`}
               >
                 🗑️
